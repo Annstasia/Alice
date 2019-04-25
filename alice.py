@@ -46,10 +46,10 @@ def handle_dialog(res, req):
     else:
         # Проверка вызова помощи
         if 'помощь' in req['request']['nlu']['tokens']:
-            res['response']['text'] = 'Для поиска улицы введите имя или фамилию. Если улица будет' \
-                                      ' обнаружена, у Вас будет возможность посмотреть ее на карте.' \
-                                      ' Если улица не будет обнаружена, но найдется подходщий ' \
-                                      'географический объект - будет выведен он.'
+            res['response']['text'] = 'Для поиска улицы введите имя или фамилию в именительном падеже.' \
+                                      'Если улица будет обнаружена, у Вас будет возможность ' \
+                                      'посмотреть ее на карте. Если улица не будет обнаружена, ' \
+                                      'но найдется подходщий географический объект - будет выведен он.'
             # Если в sessionStorage[user_id]['coords'] указаны координаты,
             # то можно просмотреть изображения объекта
             # При вызове помощи не предпологается повторный вызов, поэтому данной кнопки нет
@@ -103,6 +103,10 @@ def handle_dialog(res, req):
                 }
             ]
             return
+        if req['request']['command'].lower() in ['пока', "до свидания", "удачи", "прощай"]:
+            res['response']['text'] = 'До свидания!'
+            res['response']['end_session'] = True
+            return
 
         # Поиск имени во входной строке
         name = get_name(req)
@@ -122,19 +126,21 @@ def handle_dialog(res, req):
         if name[0] or name[1]:
             # Если введено имя с фамилией
             if name[0] and name[1]:
-                # При вводе женской фамилии предпочтиетльно найти улицу, носящую женскую фамилию.
-                # Например при вводе Сидорова - улица Сидоровой, а не Сидорова
                 # Т.к. чаще всего в названиях улиц имена и фамилии фигурируют в радительном падеже,
                 # Введенные имена/фамилии переводятся в родительный падеж
-                word1 = pymorphy2.MorphAnalyzer().parse(name[0])[0].inflect({'gent'}).word
-                word2 = pymorphy2.MorphAnalyzer().parse(name[1])[0].inflect({'gent'}).word
+                word1 = [i for i in pymorphy2.MorphAnalyzer().parse(name[0]) if i.tag.case == 'nomn'][0].inflect(
+                    {'gent'}).word
+                word2 = [i for i in pymorphy2.MorphAnalyzer().parse(name[1]) if i.tag.case == 'nomn'][0].inflect(
+                    {'gent'}).word
             elif name[0]:
                 # Если задано только имя
-                word1 = pymorphy2.MorphAnalyzer().parse(name[0])[0].inflect({'gent'}).word
+                word1 = [i for i in pymorphy2.MorphAnalyzer().parse(name[0]) if i.tag.case == 'nomn'][0].inflect(
+                    {'gent'}).word
                 word2 = ''
             else:
                 # Если задана только фамилия
-                word1 = pymorphy2.MorphAnalyzer().parse(name[1])[0].inflect({'gent'}).word
+                word1 = [i for i in pymorphy2.MorphAnalyzer().parse(name[1]) if i.tag.case == 'nomn'][0].inflect(
+                    {'gent'}).word
                 word2 = ''
             # Поиск геокодером именной улицы
             geocoder_request = "http://geocode-maps.yandex.ru/1.x/"
@@ -189,9 +195,7 @@ def handle_dialog(res, req):
                 ]
                 res['response']['text'] = adress
                 return
-        if req['request']['command'].lower() in ['пока', "до свидания", "удачи", "прощай"]:
-            res['response']['text'] = 'До свидания!'
-            res['response']['end_session'] = True
+
         # Если по по имени/фамилии не нашлось ни улиц, ни других географических объектов
         res['response']['text'] = 'По введенным данным не удалось обнаружить географический объект'
         res['response']['buttons'] = [
